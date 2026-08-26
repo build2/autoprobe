@@ -6,6 +6,6 @@ summary: Example of autoconf-style configuration probing in build2
 license: MIT
 description-file: README.md
 url: https://example.org/autoprobe
-builds: all: -msvc
+builds: all : -msvc
 depends: * build2 >= 0.18.0
 depends: * bpkg >= 0.18.0
