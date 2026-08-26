@@ -2,7 +2,7 @@
 name: autoprobe
 version: 0.1.0-a.0.z
 language: c++
-summary: autoprobe example
+summary: Example of autoconf-style configuration probing in build2
 license: MIT
 description-file: README.md
 url: https://example.org/autoprobe
