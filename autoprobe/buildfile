@@ -19,13 +19,13 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   null = ($build.host.class == 'windows' ? nul : /dev/null)
 
   # First compile control, saving the header dependency information into the
-  # the temporary file.
+  # the temporary file. Suppress warnings.
   #
-  $cxx.path $poptions -DCONTROL $coptions $cxx.mode -MD -MF $t -o $null -c $s
+  $cxx.path $poptions -DCONTROL $coptions $cxx.mode -w -MD -MF $t -o $null -c $s
 
-  # Compile the probe discarding any diagnostics.
+  # Then compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions $cxx.mode -o $null -c $s 2>-
+  if $cxx.path $poptions $coptions $cxx.mode -w -o $null -c $s 2>-
     r = true
   else
     r = false
