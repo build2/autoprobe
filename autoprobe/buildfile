@@ -16,23 +16,21 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   poptions = $cxx.poptions $cc.poptions
   coptions = $cc.coptions $cxx.coptions
 
-  # First compile control, saving the header dependency information into a
-  # local variable (we cannot write to the temporary file directly because
-  # we use it as a place to write the object file).
+  null = ($build.host.class == 'windows' ? nul : /dev/null)
+
+  # First compile control, saving the header dependency information into the
+  # the temporary file.
   #
-  # @@ Use /dev/null or nul on POSIX/Windows?
-  #
-  $cxx.path $poptions -DCONTROL $coptions $cxx.mode -MD -MF - -o $t -c $s | set d
+  $cxx.path $poptions -DCONTROL $coptions $cxx.mode -MD -MF $t -o $null -c $s
 
   # Compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions $cxx.mode -o $t -c $s 2>-
+  if $cxx.path $poptions $coptions $cxx.mode -o $null -c $s 2>-
     r = true
   else
     r = false
 
   echo "have_$n = $r" >$o
-  echo "$d" >$t
 }}
 
 probes = have-strlcpy have-strlcat
