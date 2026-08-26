@@ -1,0 +1,11 @@
+: 1
+name: autoprobe
+version: 0.1.0-a.0.z
+language: c++
+summary: autoprobe example
+license: MIT
+description-file: README.md
+url: https://example.org/autoprobe
+builds: all: -msvc
+depends: * build2 >= 0.18.0
+depends: * bpkg >= 0.18.0

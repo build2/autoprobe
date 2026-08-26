@@ -1,0 +1,77 @@
+buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
+{{
+  s = $path($<) # Source.
+  o = $path($>) # Output.
+  t = $(o).t    # Temporary file.
+
+  # Extract header dependency information from the temporary file that
+  # will be generated as a byproduct of control compilation.
+  #
+  depdb dyndep --byproduct --what=header --default-type=h --file $t
+
+  n = $replace($name($>), 'have-', '', first_only)
+
+  diag check "for $n" -> $>
+
+  poptions = $cxx.poptions $cc.poptions
+  coptions = $cc.coptions $cxx.coptions
+
+  # First compile control, saving the header dependency information into a
+  # local variable (we cannot write to the temporary file directly because
+  # we use it as a place to write the object file).
+  #
+  # @@ Use /dev/null or nul on POSIX/Windows?
+  #
+  $cxx.path $poptions -DCONTROL $coptions $cxx.mode -MD -MF - -o $t -c $s | set d
+
+  # Compile the probe discarding any diagnostics.
+  #
+  if $cxx.path $poptions $coptions $cxx.mode -o $t -c $s 2>-
+    r = true
+  else
+    r = false
+
+  echo "have_$n = $r" >$o
+  echo "$d" >$t
+}}
+
+probes = have-strlcpy have-strlcat
+
+#\
+probes =
+for i: $integer_sequence(0, 499)
+  probes += "have-strlcpy_$i" "have-strlcat_$i"
+#\
+
+for p: $probes
+  buildfile{$p}: cxx{$p}
+
+update buildfile{$probes}
+
+source $path(buildfile{$probes})
+
+./: buildfile{$probes} # Make sure gets cleaned.
+
+#\
+buildfile{have-strlcpy}: cxx{have-strlcpy}
+buildfile{have-strlcat}: cxx{have-strlcat}
+
+update buildfile{have-strlcpy have-strlcat}
+
+source $path(buildfile{have-strlcpy have-strlcat})
+
+./: buildfile{have-strlcpy have-strlcat} # Make sure gets cleaned.
+#\
+
+#\
+info "have strlcpy: $have_strlcpy"
+info "have strlcat: $have_strlcat"
+#\
+
+./: exe{autoprobe}: {hxx ixx txx cxx}{** -have-*} testscript
+
+cxx.poptions =+ "-I$out_root" "-I$src_root"
+
+
+# @@ If doesn't exist during clean, will be annoying.
+# @@ Probably move checks to subdirectory -- easier to exclude.

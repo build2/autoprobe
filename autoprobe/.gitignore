@@ -1,0 +1,9 @@
+autoprobe
+
+# Auto-generated buildfile fragments.
+#
+have-*.build
+
+# Testscript output directory (can be symlink).
+#
+test-autoprobe
