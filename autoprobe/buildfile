@@ -20,11 +20,11 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
-  $cxx.path $poptions -DCONTROL $coptions -MD -MF $t -c $s
+  $cxx.path $poptions -DCONTROL $coptions -MD -MF $t $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions -c $s 2>-
+  if $cxx.path $poptions $coptions $s 2>-
     r = true
   else
     r = false
@@ -66,11 +66,11 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
-  $c.path $poptions -DCONTROL $coptions -MD -MF $t -c $s
+  $c.path $poptions -DCONTROL $coptions -MD -MF $t $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $c.path $poptions $coptions -c $s 2>-
+  if $c.path $poptions $coptions $s 2>-
     r = true
   else
     r = false
