@@ -15,18 +15,16 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   diag check "for $n" -> $>
 
   poptions = $cxx.poptions $cc.poptions
-  coptions = $cc.coptions $cxx.coptions $cxx.mode
-
-  null = ($build.host.class == 'windows' ? nul : /dev/null)
+  coptions = $cc.coptions $cxx.coptions $cxx.mode -fsyntax-only
 
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
-  $cxx.path $poptions -DCONTROL $coptions -MD -MF $t -o $null -c $s
+  $cxx.path $poptions -DCONTROL $coptions -MD -MF $t -c $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions -o $null -c $s 2>-
+  if $cxx.path $poptions $coptions -c $s 2>-
     r = true
   else
     r = false
@@ -63,18 +61,16 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   poptions = $c.poptions $cc.poptions
   coptions = $regex.filter_out_match($cc.coptions $c.coptions $c.mode,\
                                      '(-w|--no-warning|-std=.+)') \
-    -std=c99 --pedantic-errors -x c
-
-  null = ($build.host.class == 'windows' ? nul : /dev/null)
+    -std=c99 --pedantic-errors -x c -fsyntax-only
 
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
-  $c.path $poptions -DCONTROL $coptions -MD -MF $t -o $null -c $s
+  $c.path $poptions -DCONTROL $coptions -MD -MF $t -c $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $c.path $poptions $coptions -o $null -c $s 2>-
+  if $c.path $poptions $coptions -c $s 2>-
     r = true
   else
     r = false
@@ -84,11 +80,9 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 
 probes = have-strlcpy have-strlcat
 
-#\
-probes =
-for i: $integer_sequence(0, 499)
-  probes += "have-strlcpy_$i" "have-strlcat_$i"
-#\
+#probes =
+#for i: $integer_sequence(0, 499)
+#  probes += "have-strlcpy_$i" "have-strlcat_$i"
 
 for p: $probes
   buildfile{$p}: cxx{$p}
