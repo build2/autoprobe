@@ -1,3 +1,4 @@
+#\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 {{
   s = $path($<) # Source.
@@ -14,18 +15,66 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   diag check "for $n" -> $>
 
   poptions = $cxx.poptions $cc.poptions
-  coptions = $cc.coptions $cxx.coptions
+  coptions = $cc.coptions $cxx.coptions $cxx.mode
 
   null = ($build.host.class == 'windows' ? nul : /dev/null)
 
   # First compile control, saving the header dependency information into the
-  # the temporary file. Suppress warnings.
+  # temporary file.
   #
-  $cxx.path $poptions -DCONTROL $coptions $cxx.mode -w -MD -MF $t -o $null -c $s
+  $cxx.path $poptions -DCONTROL $coptions -MD -MF $t -o $null -c $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions $cxx.mode -w -o $null -c $s 2>-
+  if $cxx.path $poptions $coptions -o $null -c $s 2>-
+    r = true
+  else
+    r = false
+
+  echo "have_$n = $r" >$o
+}}
+#\
+
+buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
+{{
+  s = $path($<) # Source.
+  o = $path($>) # Output.
+  t = $(o).t    # Temporary file.
+
+  # Extract header dependency information from the temporary file that
+  # will be generated as a byproduct of control compilation.
+  #
+  depdb dyndep --byproduct --what=header --default-type=h --file $t
+
+  n = $replace($name($>), 'have-', '', first_only)
+
+  diag check "for $n" -> $>
+
+  # Turn certain warnings into errors to detect missing functions, etc., in C.
+  # At a minimum we would want -Werror=implicit-function-declaration but
+  # --pedantic-errors with -std=c99 covers few more that detect function
+  # signature incompatibilities.
+  #
+  # Note that we need to filter out user options that may interfere with what
+  # we are trying to achieve. Specifically, -w|--no-warning disables warnings
+  # without the possibility of being re-enabled. Also filter out -std to
+  # enable C99.
+  #
+  poptions = $c.poptions $cc.poptions
+  coptions = $regex.filter_out_match($cc.coptions $c.coptions $c.mode,\
+                                     '(-w|--no-warning|-std=.+)') \
+    -std=c99 --pedantic-errors -x c
+
+  null = ($build.host.class == 'windows' ? nul : /dev/null)
+
+  # First compile control, saving the header dependency information into the
+  # temporary file.
+  #
+  $c.path $poptions -DCONTROL $coptions -MD -MF $t -o $null -c $s
+
+  # Then compile the probe discarding any diagnostics.
+  #
+  if $c.path $poptions $coptions -o $null -c $s 2>-
     r = true
   else
     r = false
