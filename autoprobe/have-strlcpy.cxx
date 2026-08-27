@@ -1,6 +1,6 @@
 #include <string.h>
 
-size_t f ()
+size_t f (void)
 {
   char dst[8];
 
