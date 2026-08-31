@@ -1,5 +1,6 @@
-#\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
+%
+if ($cxx.class == 'gcc') # GCC and Clang.
 {{
   s = $path($<) # Source.
   o = $path($>) # Output.
@@ -31,8 +32,56 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 
   echo "have_$n = $r" >$o
 }}
-#\
+elif ($cxx.class == 'msvc')
+{{
+  s = $path($<) # Source.
+  o = $path($>) # Output.
+  t = $(o).t    # Temporary file.
 
+  # Extract header dependency information from the temporary file that
+  # will be generated as a byproduct of control compilation.
+  #
+  depdb dyndep --byproduct --format=lines --what=header --default-type=h --file $t
+
+  n = $replace($name($>), 'have-', '', first_only)
+
+  diag check "for $n" -> $>
+
+  # @@ /EHsc may override user-specified
+  #
+  poptions = $cxx.poptions $cc.poptions
+  coptions = $cc.coptions $cxx.coptions $cxx.mode /nologo /EHsc /Zs
+
+  # First compile control, saving the header dependency information into the
+  # temporary file.
+  #
+  #
+  #
+  $cxx.path $poptions -DCONTROL $coptions /sourceDependencies $t $s 2>&1 | \
+    sed -n -e "s%^\(?!$leaf($s)\$\).*%\$&%p" 1>&2
+
+  # Then compile the probe discarding any diagnostics.
+  #
+  if $cxx.path $poptions $coptions $s 1>- 2>&1
+    r = true
+  else
+    r = false
+
+  echo "have_$n = $r" >$o
+
+  # Translate the /sourceDependencies JSON format to the list of headers.
+  #
+  # While there are several version of this format (1.0, 1.1, and 1.2), they
+  # all have Includes inside Data. And we ignore the rest (modules, PCH, etc).
+  #
+  set d [json_object] <$t
+
+  true >$t # Truncate.
+  for h: ($d[Data][Includes])
+    echo "$h" >>$t
+}}
+
+#\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 {{
   s = $path($<) # Source.
@@ -77,6 +126,7 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 
   echo "have_$n = $r" >$o
 }}
+#\
 
 probes = have-strlcpy have-strlcat
 
