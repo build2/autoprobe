@@ -1,3 +1,4 @@
+#\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 %
 if ($cxx.class == 'gcc') # GCC and Clang.
@@ -40,7 +41,7 @@ if ($cxx.class == 'gcc') # GCC and Clang.
       options += -isystem ($cxx.sys_hdr_dirs[$i])
   }
 
-  options += -finput-charset=UTF-8 -fsyntax-only
+  options += -finput-charset=UTF-8 -x c++ -fsyntax-only
 
   if ($cc.stdlib == 'musl')
     options += -D__MUSL__
@@ -127,7 +128,7 @@ elif ($cxx.class == 'msvc')
     }
   }
 
-  options += /nologo /utf-8 /Zs
+  options += /nologo /utf-8 /TP /Zs
 
   # Unless there is a custom /EH* option, add /EHsc.
   #
@@ -145,7 +146,7 @@ elif ($cxx.class == 'msvc')
   # We also have to filter the translation unit name that is always printed by
   # MSVC. Note that MSVC sends its diagnostics to stdout, not stderr.
   #
-  $cxx.path -DCONTROL $options /sourceDependencies $t $s 2>&1 | \
+  $cxx.path /DCONTROL $options /sourceDependencies $t $s 2>&1 | \
     sed -n -e "s%^\(?!$leaf($s)\$\).*%\$&%p" 1>&2
 
   # Then compile the probe discarding any diagnostics.
@@ -172,9 +173,11 @@ elif ($cxx.class == 'msvc')
   for h: ($d[Data][Includes])
     echo "$h" >>$t
 }}
-
 #\
+
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
+%
+if ($c.class == 'gcc') # GCC and Clang.
 {{
   s = $path($<) # Source.
   o = $path($>) # Output.
@@ -194,36 +197,170 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 
   diag check "for $n" -> $>
 
+  # Note that we need to filter out user options that may interfere with what
+  # we are trying to achieve below. Specifically, -w|--no-warning disables
+  # warnings without the possibility of being re-enabled. Also filter out -std
+  # to enable C99.
+  #
+  options = $c.poptions $cc.poptions
+  options += $regex.filter_out_match($cc.coptions $c.coptions $c.mode,\
+                                     '(-w|--no-warning|-std=.+)')
+
+  # Add extra system header search directories, if any.
+  #
+  # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
+  #
+  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  {
+    hdr_m = $c.sys_hdr_dirs_mode
+    hdr_e = $hdr_m
+    hdr_e += $c.sys_hdr_dirs_extra
+
+    for i: $integer_sequence($hdr_m, $hdr_e)
+      options += -isystem ($c.sys_hdr_dirs[$i])
+  }
+
   # Turn certain warnings into errors to detect missing functions, etc., in C.
   # At a minimum we would want -Werror=implicit-function-declaration but
-  # --pedantic-errors with -std=c99 covers few more that detect function
-  # signature incompatibilities.
+  # --pedantic-errors with -std=c99 covers few more that will detect certain
+  # function signature incompatibilities.
   #
-  # Note that we need to filter out user options that may interfere with what
-  # we are trying to achieve. Specifically, -w|--no-warning disables warnings
-  # without the possibility of being re-enabled. Also filter out -std to
-  # enable C99.
-  #
-  poptions = $c.poptions $cc.poptions
-  coptions = $regex.filter_out_match($cc.coptions $c.coptions $c.mode,\
-                                     '(-w|--no-warning|-std=.+)') \
-    -std=c99 --pedantic-errors -x c -fsyntax-only
+  options += -std=c99 --pedantic-errors -fsyntax-only
+  options += -finput-charset=UTF-8 -x c
+
+  if ($c.stdlib == 'musl')
+    options += -D__MUSL__
+
+  if ($c.target.system == 'win32-msvc')
+    options += -D_MT -D_DLL # /MD
 
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
-  $c.path $poptions -DCONTROL $coptions -MD -MF $t $s
+  $c.path -DCONTROL $options -MD -MF $t $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $c.path $poptions $coptions $s 2>-
+  if $c.path $options $s 2>-
     r = true
   else
     r = false
 
   echo "have_$n = $r" >$o
 }}
-#\
+elif ($c.class == 'msvc')
+{{
+  s = $path($<) # Source.
+  o = $path($>) # Output.
+  t = $(o).t    # Temporary file.
+
+  env_include = $getenv('INCLUDE')
+
+  # Track changes in compiler and environment variables that affect
+  # compilation.
+  #
+  depdb string $c.checksum
+  depdb env CL _CL_
+  depdb hash $env_include
+
+  # Extract header dependency information from the temporary file that
+  # will be generated as a byproduct of control compilation.
+  #
+  depdb dyndep --byproduct --format=lines --what=header --default-type=h --file $t
+
+  n = $replace($name($>), 'have-', '', first_only)
+
+  diag check "for $n" -> $>
+
+  options = $c.poptions $cc.poptions
+  options += $cc.coptions $c.coptions $c.mode
+
+  # Add extra system header search directories, if any. Also add normal system
+  # header search directories if there is no INCLUDE environment variable.
+  # Note that we don't bother with /external:I since it doesn't affect the
+  # order. See cc::compile_rule::append_sys_hdr_options() in build2 for
+  # details.
+  #
+  # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
+  #
+  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  {
+    hdr_m = $c.sys_hdr_dirs_mode
+    hdr_e = $hdr_m
+    hdr_e += $c.sys_hdr_dirs_extra
+
+    for i: $integer_sequence($hdr_m, $hdr_e)
+      options += /I ($c.sys_hdr_dirs[$i])
+
+    ifn $env_include
+    {
+      for i: $integer_sequence($hdr_e, $size($c.sys_hdr_dirs))
+        options += /I ($c.sys_hdr_dirs[$i])
+    }
+  }
+  else
+  {
+    # Add them all (the best we can do).
+    #
+    ifn $env_include
+    {
+      for d: $c.sys_hdr_dirs
+        options += /I $d
+    }
+  }
+
+  # Note that /weXXXX appears to enable the warning (as error) even if either
+  # all the warnings were previously disabled with /w or this specific warning
+  # was disabled with /wdXXXX.
+  #
+  # C4013 -- undefined function
+  # C4020 -- too many actual parameters
+  # C2198 -- too few arguments for call
+  # C4024 -- different types for formal and actual parameter
+  # C4133 -- incompatible types in initialization
+  # C4047 -- differs in levels of indirection
+  #
+  options += /nologo /utf-8 /TC /Zs
+  options += /we4013 /we4020 /we2198 /we4024 /we4133 /we4047
+
+  # Unless there is a custom /MD* or /MT*, add /MD.
+  #
+  if! $regex.find_match($options, '[/-]M[DT].*')
+    options += /MD
+
+  # First compile control, saving the header dependency information into the
+  # temporary file.
+  #
+  # We also have to filter the translation unit name that is always printed by
+  # MSVC. Note that MSVC sends its diagnostics to stdout, not stderr.
+  #
+  $c.path /DCONTROL $options /sourceDependencies $t $s 2>&1 | \
+    sed -n -e "s%^\(?!$leaf($s)\$\).*%\$&%p" 1>&2
+
+  # Then compile the probe discarding any diagnostics.
+  #
+  if $c.path $options $s 1>- 2>&1
+    r = true
+  else
+    r = false
+
+  echo "have_$n = $r" >$o
+
+  # Translate the /sourceDependencies JSON format to the list of headers
+  # expected by dyndep depdb --format=lines above.
+  #
+  # While there are several version of this format (1.0, 1.1, and 1.2), they
+  # all have Includes inside Data. And we ignore the rest (modules, PCH, etc).
+  #
+  set d [json_object] <$t
+
+  # @@
+  # echo $regex.merge($d[Data][Includes], '(.+)', '\1\n') >$t
+
+  true >$t # Truncate.
+  for h: ($d[Data][Includes])
+    echo "$h" >>$t
+}}
 
 probes = have-strlcpy have-strlcat
 
