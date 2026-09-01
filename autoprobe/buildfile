@@ -315,13 +315,13 @@ elif ($c.class == 'msvc')
   #
   # C4013 -- undefined function
   # C4020 -- too many actual parameters
-  # C2198 -- too few arguments for call
+  # C2198 -- too few arguments for call (error)
   # C4024 -- different types for formal and actual parameter
   # C4133 -- incompatible types in initialization
   # C4047 -- differs in levels of indirection
   #
   options += /nologo /utf-8 /TC /Zs
-  options += /we4013 /we4020 /we2198 /we4024 /we4133 /we4047
+  options += /we4013 /we4020 /we4024 /we4133 /we4047
 
   # Unless there is a custom /MD* or /MT*, add /MD.
   #
