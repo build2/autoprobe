@@ -6,7 +6,13 @@ if ($cxx.class == 'gcc') # GCC and Clang.
   o = $path($>) # Output.
   t = $(o).t    # Temporary file.
 
-  # @@ Change-track env vars that can affect compilation.
+  # Track changes in compiler and environment variables that affect
+  # compilation.
+  #
+  depdb string $cxx.checksum
+  depdb env CPATH CPLUS_INCLUDE_PATH COMPILER_PATH
+  depdb env ($cxx.id.type == 'gcc' ? GCC_EXEC_PREFIX : \
+             $cxx.id.type == 'clang' ? CCC_OVERRIDE_OPTIONS : )
 
   # Extract header dependency information from the temporary file that
   # will be generated as a byproduct of control compilation.
@@ -17,19 +23,43 @@ if ($cxx.class == 'gcc') # GCC and Clang.
 
   diag check "for $n" -> $>
 
-  # @@ sys_hdr_dirs extra (e.g., FreeBSD /usr/local/include).
+  options = $cxx.poptions $cc.poptions
+  options += $cc.coptions $cxx.coptions $cxx.mode
+
+  # Add extra system header search directories, if any.
   #
-  poptions = $cxx.poptions $cc.poptions
-  coptions = $cc.coptions $cxx.coptions $cxx.mode -fsyntax-only
+  # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
+  #
+  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  {
+    hdr_m = $cxx.sys_hdr_dirs_mode
+    hdr_e = $hdr_m
+    hdr_e += $cxx.sys_hdr_dirs_extra
+
+    for i: $integer_sequence($hdr_m, $hdr_e)
+      options += -isystem ($cxx.sys_hdr_dirs[$i])
+  }
+
+  options += -finput-charset=UTF-8 -fsyntax-only
+
+  if ($cc.stdlib == 'musl')
+    options += -D__MUSL__
+
+  if ($cxx.target.system == 'win32-msvc')
+  {
+    # Note that Clang adds the equivalent of /EHsc (more or less) by default.
+    #
+    options += -D_MT -D_DLL # /MD
+  }
 
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
-  $cxx.path $poptions -DCONTROL $coptions -MD -MF $t $s
+  $cxx.path -DCONTROL $options -MD -MF $t $s
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions $s 2>-
+  if $cxx.path $options $s 2>-
     r = true
   else
     r = false
@@ -44,6 +74,11 @@ elif ($cxx.class == 'msvc')
 
   env_include = $getenv('INCLUDE')
 
+  # Track changes in compiler and environment variables that affect
+  # compilation.
+  #
+  depdb string $cxx.checksum
+  depdb env CL _CL_
   depdb hash $env_include
 
   # Extract header dependency information from the temporary file that
@@ -55,43 +90,83 @@ elif ($cxx.class == 'msvc')
 
   diag check "for $n" -> $>
 
-  # @@ /EHsc may override user-specified
-  #
-  poptions = $cxx.poptions $cc.poptions
-  coptions = $cc.coptions $cxx.coptions $cxx.mode /nologo /EHsc /Zs
+  options = $cxx.poptions $cc.poptions
+  options += $cc.coptions $cxx.coptions $cxx.mode
 
-  # Add system header search directories if there is no INCLUDE environment
-  # variable.
+  # Add extra system header search directories, if any. Also add normal system
+  # header search directories if there is no INCLUDE environment variable.
+  # Note that we don't bother with /external:I since it doesn't affect the
+  # order. See cc::compile_rule::append_sys_hdr_options() in build2 for
+  # details.
   #
-  ifn $env_include
+  # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
+  #
+  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
   {
-    for d: $cxx.sys_hdr_dirs
-      poptions += "/I$d"
+    hdr_m = $cxx.sys_hdr_dirs_mode
+    hdr_e = $hdr_m
+    hdr_e += $cxx.sys_hdr_dirs_extra
+
+    for i: $integer_sequence($hdr_m, $hdr_e)
+      options += /I ($cxx.sys_hdr_dirs[$i])
+
+    ifn $env_include
+    {
+      for i: $integer_sequence($hdr_e, $size($cxx.sys_hdr_dirs))
+        options += /I ($cxx.sys_hdr_dirs[$i])
+    }
   }
+  else
+  {
+    # Add them all (the best we can do).
+    #
+    ifn $env_include
+    {
+      for d: $cxx.sys_hdr_dirs
+        options += /I $d
+    }
+  }
+
+  options += /nologo /utf-8 /Zs
+
+  # Unless there is a custom /EH* option, add /EHsc.
+  #
+  if! $regex.find_match($options, '[/-]EH.*')
+    options += /EHsc
+
+  # Unless there is a custom /MD* or /MT*, add /MD.
+  #
+  if! $regex.find_match($options, '[/-]M[DT].*')
+    options += /MD
 
   # First compile control, saving the header dependency information into the
   # temporary file.
   #
+  # We also have to filter the translation unit name that is always printed by
+  # MSVC. Note that MSVC sends its diagnostics to stdout, not stderr.
   #
-  #
-  $cxx.path $poptions -DCONTROL $coptions /sourceDependencies $t $s 2>&1 | \
+  $cxx.path -DCONTROL $options /sourceDependencies $t $s 2>&1 | \
     sed -n -e "s%^\(?!$leaf($s)\$\).*%\$&%p" 1>&2
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $cxx.path $poptions $coptions $s 1>- 2>&1
+  if $cxx.path $options $s 1>- 2>&1
     r = true
   else
     r = false
 
   echo "have_$n = $r" >$o
 
-  # Translate the /sourceDependencies JSON format to the list of headers.
+  # Translate the /sourceDependencies JSON format to the list of headers
+  # expected by dyndep depdb --format=lines above.
   #
   # While there are several version of this format (1.0, 1.1, and 1.2), they
   # all have Includes inside Data. And we ignore the rest (modules, PCH, etc).
   #
   set d [json_object] <$t
+
+  # @@
+  # echo $regex.merge($d[Data][Includes], '(.+)', '\1\n') >$t
 
   true >$t # Truncate.
   for h: ($d[Data][Includes])
@@ -104,6 +179,11 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
   s = $path($<) # Source.
   o = $path($>) # Output.
   t = $(o).t    # Temporary file.
+
+  depdb string $c.checksum
+  depdb env CPATH C_INCLUDE_PATH COMPILER_PATH
+  depdb env ($c.id.type == 'gcc' ? GCC_EXEC_PREFIX : \
+             $c.id.type == 'clang' ? CCC_OVERRIDE_OPTIONS : )
 
   # Extract header dependency information from the temporary file that
   # will be generated as a byproduct of control compilation.
