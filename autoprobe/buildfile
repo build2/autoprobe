@@ -1,3 +1,6 @@
+# @@ If doesn't exist during clean, will be annoying.
+# @@ Probably move checks to subdirectory -- easier to exclude.
+
 #\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 %
@@ -31,7 +34,7 @@ if ($cxx.class == 'gcc') # GCC and Clang.
   #
   # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
   #
-  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  if ($build.version.major > 0 || $build.version.minor > 18)
   {
     hdr_m = $cxx.sys_hdr_dirs_mode
     hdr_e = $hdr_m
@@ -102,7 +105,7 @@ elif ($cxx.class == 'msvc')
   #
   # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
   #
-  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  if ($build.version.major > 0 || $build.version.minor > 18)
   {
     hdr_m = $cxx.sys_hdr_dirs_mode
     hdr_e = $hdr_m
@@ -210,7 +213,7 @@ if ($c.class == 'gcc') # GCC and Clang.
   #
   # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
   #
-  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  if ($build.version.major > 0 || $build.version.minor > 18)
   {
     hdr_m = $c.sys_hdr_dirs_mode
     hdr_e = $hdr_m
@@ -283,7 +286,7 @@ elif ($c.class == 'msvc')
   #
   # Note that sys_hdr_dirs_{extra,mode} are only available since build2 0.19.
   #
-  if ($build.version.major > 0 || $build.version.minor > 19) # @@ TMP 18
+  if ($build.version.major > 0 || $build.version.minor > 18)
   {
     hdr_m = $c.sys_hdr_dirs_mode
     hdr_e = $hdr_m
@@ -396,7 +399,3 @@ info "have strlcat: $have_strlcat"
 ./: exe{autoprobe}: {hxx ixx txx cxx}{** -have-*} testscript
 
 cxx.poptions =+ "-I$out_root" "-I$src_root"
-
-
-# @@ If doesn't exist during clean, will be annoying.
-# @@ Probably move checks to subdirectory -- easier to exclude.
