@@ -170,7 +170,7 @@ elif ($cxx.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $regex.merge([strings] $d[Data][Includes], '(.+)', '\1\n') >$t
+    echo $regex.merge([strings] $d[Data][Includes], '(.+)', '\1', $\n) >$t
   }
   else
   {
@@ -362,7 +362,7 @@ elif ($c.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $regex.merge($d[Data][Includes], '(.+)', '\1\n') >$t
+    echo $regex.merge($d[Data][Includes], '(.+)', '\1', $\n) >$t
   }
   else
   {
