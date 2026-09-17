@@ -1,7 +1,6 @@
 # @@ If doesn't exist during clean, will be annoying.
 # @@ Probably move checks to subdirectory -- easier to exclude.
 
-#\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 %
 if ($cxx.class == 'gcc') # GCC and Clang.
@@ -169,15 +168,19 @@ elif ($cxx.class == 'msvc')
   #
   set d [json_object] <$t
 
-  # @@
-  # echo $regex.merge($d[Data][Includes], '(.+)', '\1\n') >$t
-
-  true >$t # Truncate.
-  for h: ($d[Data][Includes])
-    echo "$h" >>$t
+  if ($build.version.major > 0 || $build.version.minor > 18)
+  {
+    echo $regex.merge([strings] $d[Data][Includes], '(.+)', '\1\n') >$t
+  }
+  else
+  {
+    true >$t # Truncate.
+    for h: ($d[Data][Includes])
+      echo "$h" >>$t
+  }
 }}
-#\
 
+#\
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 %
 if ($c.class == 'gcc') # GCC and Clang.
@@ -357,13 +360,18 @@ elif ($c.class == 'msvc')
   #
   set d [json_object] <$t
 
-  # @@
-  # echo $regex.merge($d[Data][Includes], '(.+)', '\1\n') >$t
-
-  true >$t # Truncate.
-  for h: ($d[Data][Includes])
-    echo "$h" >>$t
+  if ($build.version.major > 0 || $build.version.minor > 18)
+  {
+    echo $regex.merge($d[Data][Includes], '(.+)', '\1\n') >$t
+  }
+  else
+  {
+    true >$t # Truncate.
+    for h: ($d[Data][Includes])
+      echo "$h" >>$t
+  }
 }}
+#\
 
 probes = have-strlcpy have-strlcat
 
