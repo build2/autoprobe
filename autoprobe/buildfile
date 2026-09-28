@@ -169,7 +169,7 @@ elif ($cxx.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $merge([strings] $d[Data][Includes], $\n) >$t
+    echo $merge([strings] $d[Data][Includes], "$\n") >$t
   }
   else
   {
@@ -362,7 +362,7 @@ elif ($c.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $merge([strings] $d[Data][Includes], $\n) >$t
+    echo $merge([strings] $d[Data][Includes], "$\n") >$t
   }
   else
   {
