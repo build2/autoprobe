@@ -1,6 +1,6 @@
 #include <string.h>
 
-size_t f (void)
+size_t f ()
 {
   char dst[8] = "strl";
 

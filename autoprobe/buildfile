@@ -1,6 +1,8 @@
 # @@ If doesn't exist during clean, will be annoying.
 # @@ Probably move checks to subdirectory -- easier to exclude.
 
+# C++ probe rule.
+#
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 %
 if ($cxx.class == 'gcc') # GCC and Clang.
@@ -170,7 +172,7 @@ elif ($cxx.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $regex.merge([strings] $d[Data][Includes], '(.+)', '\1', $\n) >$t
+    echo $merge([strings] $d[Data][Includes], $\n) >$t
   }
   else
   {
@@ -180,8 +182,9 @@ elif ($cxx.class == 'msvc')
   }
 }}
 
-#\
-buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
+# C probe rule.
+#
+buildfile{~'/have-(.*)/'}: c{~'/have-\1/'}
 %
 if ($c.class == 'gcc') # GCC and Clang.
 {{
@@ -247,7 +250,7 @@ if ($c.class == 'gcc') # GCC and Clang.
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $c.path $options $s 2>-
+  if $c.path $options $s 2>|
     r = true
   else
     r = false
@@ -362,7 +365,7 @@ elif ($c.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $regex.merge($d[Data][Includes], '(.+)', '\1', $\n) >$t
+    echo $merge([strings] $d[Data][Includes], $\n) >$t
   }
   else
   {
@@ -371,39 +374,40 @@ elif ($c.class == 'msvc')
       echo "$h" >>$t
   }
 }}
-#\
 
-probes = have-strlcpy have-strlcat
+# Compile options that should be included in the probes.
+#
 
-#probes =
-#for i: $integer_sequence(0, 499)
-#  probes += "have-strlcpy_$i" "have-strlcat_$i"
+# If targeting Linux define _GNU_SOURCE (used to enable strl*() in glibc,
+# musl, etc).
+#
+if ($c.target.class == 'linux')
+  c.poptions += -D_GNU_SOURCE
 
-for p: $probes
+# Probes.
+#
+c_probes = have-strlcpy
+cxx_probes = have-strlcat
+
+for p: $c_probes
+  buildfile{$p}: c{$p}
+
+for p: $cxx_probes
   buildfile{$p}: cxx{$p}
+
+probes = $c_probes $cxx_probes
 
 update buildfile{$probes}
 
 source $path(buildfile{$probes})
 
+info HAVE_STRLCPY: $have_strlcpy
+info HAVE_STRLCAT: $have_strlcat
+
 ./: buildfile{$probes} # Make sure gets cleaned.
 
-#\
-buildfile{have-strlcpy}: cxx{have-strlcpy}
-buildfile{have-strlcat}: cxx{have-strlcat}
-
-update buildfile{have-strlcpy have-strlcat}
-
-source $path(buildfile{have-strlcpy have-strlcat})
-
-./: buildfile{have-strlcpy have-strlcat} # Make sure gets cleaned.
-#\
-
-#\
-info "have strlcpy: $have_strlcpy"
-info "have strlcat: $have_strlcat"
-#\
-
+# The rest of the buildfile (make sure to exclude probes).
+#
 ./: exe{autoprobe}: {hxx ixx txx cxx}{** -have-*} testscript
 
 cxx.poptions =+ "-I$out_root" "-I$src_root"
