@@ -394,9 +394,22 @@ for p: $cxx_probes
 
 probes = $c_probes $cxx_probes
 
-update probes/buildfile{$probes}
+# Depending on how the result of the probes is used, it may be appropriate
+# to limit them to perform (see the `update` directive documentation for
+# details).
+#
+#if ($build.meta_operation == 'perform')
+#{
 
+update probes/buildfile{$probes}
 source $path(probes/buildfile{$probes})
+
+#}
+#else
+#{
+#  have_strlcpy = false
+#  have_strlcat = false
+#}
 
 ./: probes/buildfile{$probes} # Make sure gets cleaned.
 
