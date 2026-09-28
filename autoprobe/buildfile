@@ -169,7 +169,7 @@ elif ($cxx.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $merge([strings] $d[Data][Includes], "$\n") >$t
+    echo $merge([strings] $d[Data][Includes], $\n) >$t
   }
   else
   {
@@ -247,7 +247,7 @@ if ($c.class == 'gcc') # GCC and Clang.
 
   # Then compile the probe discarding any diagnostics.
   #
-  if $c.path $options $s 2>|
+  if $c.path $options $s 2>-
     r = true
   else
     r = false
@@ -362,7 +362,7 @@ elif ($c.class == 'msvc')
 
   if ($build.version.major > 0 || $build.version.minor > 18)
   {
-    echo $merge([strings] $d[Data][Includes], "$\n") >$t
+    echo $merge([strings] $d[Data][Includes], $\n) >$t
   }
   else
   {
