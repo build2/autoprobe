@@ -1,6 +1,3 @@
-# @@ If doesn't exist during clean, will be annoying.
-# @@ Probably move checks to subdirectory -- easier to exclude.
-
 # C++ probe rule.
 #
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
@@ -390,24 +387,25 @@ c_probes = have-strlcpy
 cxx_probes = have-strlcat
 
 for p: $c_probes
-  buildfile{$p}: c{$p}
+  probes/buildfile{$p}: probes/c{$p}
 
 for p: $cxx_probes
-  buildfile{$p}: cxx{$p}
+  probes/buildfile{$p}: probes/cxx{$p}
 
 probes = $c_probes $cxx_probes
 
-update buildfile{$probes}
+update probes/buildfile{$probes}
 
-source $path(buildfile{$probes})
+source $path(probes/buildfile{$probes})
+
+./: probes/buildfile{$probes} # Make sure gets cleaned.
 
 info HAVE_STRLCPY: $have_strlcpy
 info HAVE_STRLCAT: $have_strlcat
 
-./: buildfile{$probes} # Make sure gets cleaned.
 
 # The rest of the buildfile (make sure to exclude probes).
 #
-./: exe{autoprobe}: {hxx ixx txx cxx}{** -have-*} testscript
+./: exe{autoprobe}: {hxx ixx txx cxx}{** -probes/**} testscript
 
 cxx.poptions =+ "-I$out_root" "-I$src_root"
