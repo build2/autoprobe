@@ -1,9 +1,11 @@
-autoprobe
+autoprobe-c
+autoprobe-cxx
 
 # Auto-generated buildfile fragments.
 #
 have-*.build
 
-# Testscript output directory (can be symlink).
+# Testscript output directories (can be symlink).
 #
-test-autoprobe
+test-autoprobe-c
+test-autoprobe-cxx
