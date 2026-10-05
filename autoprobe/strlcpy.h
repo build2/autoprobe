@@ -1,5 +1,5 @@
-#ifndef STRLCAT_H
-#define STRLCAT_H
+#ifndef STRLCPY_H
+#define STRLCPY_H
 
 #ifdef __cplusplus
 extern "C" {
