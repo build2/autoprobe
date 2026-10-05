@@ -1,14 +1,24 @@
 #include <iostream>
 
-int main (int argc, char* argv[])
+#include <string.h>
+
+#ifndef HAVE_STRLCPY
+#  include "strlcpy.h"
+#endif
+
+#ifndef HAVE_STRLCAT
+#  include "strlcat.h"
+#endif
+
+int main ()
 {
   using namespace std;
 
-  if (argc < 2)
-  {
-    cerr << "error: missing name" << endl;
-    return 1;
-  }
+  char buf[7] = "strl";
 
-  cout << "Hello, " << argv[1] << '!' << endl;
+  strlcat (buf, "cat", sizeof (buf));
+  cout << "strlcat: " << buf << endl;
+
+  strlcpy (buf, "strlcpy", sizeof (buf));
+  cout << "strlcpy: " << buf << endl;
 }

@@ -413,12 +413,17 @@ source $path(probes/buildfile{$probes})
 
 ./: probes/buildfile{$probes} # Make sure gets cleaned.
 
-info HAVE_STRLCPY: $have_strlcpy
-info HAVE_STRLCAT: $have_strlcat
-
+#info have_strlcpy: $have_strlcpy
+#info have_strlcat: $have_strlcat
 
 # The rest of the buildfile (make sure to exclude probes).
 #
-./: exe{autoprobe}: {hxx ixx txx cxx}{** -probes/**} testscript
+./: exe{autoprobe}: {hxx ixx txx cxx h c}{** -strl* -probes/**} testscript
+
+exe{autoprobe}: {h c}{strlcpy}: include = (!$have_strlcpy)
+exe{autoprobe}: {h c}{strlcat}: include = (!$have_strlcat)
+
+cxx.poptions += ($have_strlcpy ? -DHAVE_STRLCPY : )
+cxx.poptions += ($have_strlcat ? -DHAVE_STRLCAT : )
 
 cxx.poptions =+ "-I$out_root" "-I$src_root"
