@@ -229,9 +229,10 @@ if ($c.class == 'gcc') # GCC and Clang.
   # Turn certain warnings into errors to detect missing functions, etc., in C.
   # At a minimum we would want -Werror=implicit-function-declaration but
   # --pedantic-errors with -std=c99 covers few more that will detect certain
-  # function signature incompatibilities.
+  # function signature incompatibilities. Except in older Clang.
   #
-  options += -std=c99 --pedantic-errors -fsyntax-only
+  options += -std=c9x --pedantic-errors -fsyntax-only
+  options += ($c.id.type == 'clang' ? -Werror=implicit-function-declaration : )
   options += -finput-charset=UTF-8 -x c
 
   if ($c.stdlib == 'musl')
