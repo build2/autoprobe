@@ -1,6 +1,5 @@
 : basics
 :
 $* >>EOO
-strlcat: strlca
-strlcpy: strlcp
+strlc
 EOO
