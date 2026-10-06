@@ -1,6 +1,3 @@
-# @@ Update manual note, libbuild2-autoconf README with ref. Also ref to HOWTO
-#    from autoprobe.
-
 # C++ probe rule.
 #
 buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
@@ -486,10 +483,9 @@ buildfile{~'/have-(.*)-h/'}:
 
   diag check "for $h" -> $>
 
-  # First evaluate dependency buildfiles, if any, and short-circuit
-  # compilation if any of them are false.
-  #
-  # @@ Can we avoid calling find_system_header()?
+  # Evaluate dependency buildfiles, if any. Note that we cannot really
+  # short-circuit the above call to find_system_header() because it has
+  # to be called in the depdb preamble, which is executed during match.
   #
   for b: $filter($<, buildfile)
   {
@@ -516,26 +512,37 @@ buildfile{~'/have-(.*)-h/'}:
 if ($c.target.class == 'linux')
   c.poptions += -D_GNU_SOURCE
 
-# System header/library presence checks (no probes).
+# System header/library presence check (no generated buildfile version).
 #
 #have_string_h = ($c.find_system_header(string.h) != [null])
 
 # Probes.
 #
-h_probes = have-string-h
-c_probes = have-strlcpy
-cxx_probes = have-strlcat
+probes =
 
-for p: $h_probes
+# Header presence probes.
+#
+for p: have-string-h
+{
   probes/buildfile{$p}: header_name = string1.h # @@ TMP
+  probes += probes/buildfile{$p}
+}
 
-for p: $c_probes
-  probes/buildfile{$p}: probes/c{$p} probes/buildfile{$h_probes}
+# C probes.
+#
+for p: have-strlcpy
+{
+  probes/buildfile{$p}: probes/c{$p} probes/buildfile{have-string-h}
+  probes += probes/buildfile{$p}
+}
 
-for p: $cxx_probes
-  probes/buildfile{$p}: probes/cxx{$p} probes/buildfile{$h_probes}
-
-probes = $h_probes $c_probes $cxx_probes
+# C++ probes.
+#
+for p: have-strlcat
+{
+  probes/buildfile{$p}: probes/cxx{$p} probes/buildfile{have-string-h}
+  probes += probes/buildfile{$p}
+}
 
 # Depending on how the result of the probes is used, it may be appropriate
 # to limit them to perform (see the `update` directive documentation for
@@ -544,8 +551,8 @@ probes = $h_probes $c_probes $cxx_probes
 #if ($build.meta_operation == 'perform')
 #{
 
-update probes/buildfile{$probes}
-source $path(probes/buildfile{$probes})
+update $probes
+source $path($probes)
 
 #}
 #else
@@ -554,7 +561,7 @@ source $path(probes/buildfile{$probes})
 #  have_strlcat = false
 #}
 
-./: probes/buildfile{$probes} # Make sure gets cleaned.
+./: $probes # Make sure gets cleaned.
 
 #info have_string_h: $have_string_h
 #info have_strlcpy: $have_strlcpy
