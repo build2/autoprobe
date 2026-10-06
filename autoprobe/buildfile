@@ -4,9 +4,9 @@ buildfile{~'/have-(.*)/'}: cxx{~'/have-\1/'}
 %
 if ($cxx.class == 'gcc') # GCC and Clang.
 {{
-  s = $path($<) # Source.
-  o = $path($>) # Output.
-  t = $(o).t    # Temporary file.
+  s = $path($<[0]) # Probe source (should come first).
+  o = $path($>)    # Output.
+  t = $(o).t       # Temporary file.
 
   # Track changes in compiler and environment variables that affect
   # compilation.
@@ -22,8 +22,32 @@ if ($cxx.class == 'gcc') # GCC and Clang.
   depdb dyndep --byproduct --what=header --default-type=h --file $t
 
   n = $replace($name($>), 'have-', '', first_only)
+  v = "have_$regex.replace($n, '[-.+]', '_')" # Sanitize to variable name.
 
   diag check "for $n" -> $>
+
+  # First evaluate dependency buildfiles, if any, and short-circuit
+  # compilation if any of them are false.
+  #
+  # @@ TODO: add support for negation via prerequisite-specific variable
+  #    (see GH #574). Also below.
+  #
+  for b: $filter($<, buildfile)
+  {
+    sed -n -e 's/^have_[^ ]+ = (true|false)$/\1/p' $path($b) | set r
+
+    if ($r == 'false')
+    {
+      # Write dummy header dependency in make format, escaping special
+      # characters.
+      #
+      echo "dummy.o: $regex.replace($s , '([ :\\])', '\\\1')" >$t
+      echo "$v = false" >$o
+      exit 0
+    }
+    elif ($r != 'true')
+      exit 1 "invalid variable assignment format in $path($b)"
+  }
 
   options = $cxx.poptions $cc.poptions
   options += $cc.coptions $cxx.coptions $cxx.mode
@@ -66,13 +90,13 @@ if ($cxx.class == 'gcc') # GCC and Clang.
   else
     r = false
 
-  echo "have_$n = $r" >$o
+  echo "$v = $r" >$o
 }}
 elif ($cxx.class == 'msvc')
 {{
-  s = $path($<) # Source.
-  o = $path($>) # Output.
-  t = $(o).t    # Temporary file.
+  s = $path($<[0]) # Probe source (should come first).
+  o = $path($>)    # Output.
+  t = $(o).t       # Temporary file.
 
   env_include = $getenv('INCLUDE')
 
@@ -157,7 +181,9 @@ elif ($cxx.class == 'msvc')
   else
     r = false
 
-  echo "have_$n = $r" >$o
+  # Sanitize check name to variable name.
+  #
+  echo "have_$regex.replace($n, '[-.+]', '_') = $r" >$o
 
   # Translate the /sourceDependencies JSON format to the list of headers
   # expected by dyndep depdb --format=lines above.
@@ -185,9 +211,9 @@ buildfile{~'/have-(.*)/'}: c{~'/have-\1/'}
 %
 if ($c.class == 'gcc') # GCC and Clang.
 {{
-  s = $path($<) # Source.
-  o = $path($>) # Output.
-  t = $(o).t    # Temporary file.
+  s = $path($<[0]) # Probe source (should come first).
+  o = $path($>)    # Output.
+  t = $(o).t       # Temporary file.
 
   depdb string $c.checksum
   depdb env CPATH C_INCLUDE_PATH COMPILER_PATH
@@ -253,13 +279,15 @@ if ($c.class == 'gcc') # GCC and Clang.
   else
     r = false
 
-  echo "have_$n = $r" >$o
+  # Sanitize check name to variable name.
+  #
+  echo "have_$regex.replace($n, '[-.+]', '_') = $r" >$o
 }}
 elif ($c.class == 'msvc')
 {{
-  s = $path($<) # Source.
-  o = $path($>) # Output.
-  t = $(o).t    # Temporary file.
+  s = $path($<[0]) # Probe source (should come first).
+  o = $path($>)    # Output.
+  t = $(o).t       # Temporary file.
 
   env_include = $getenv('INCLUDE')
 
@@ -351,7 +379,9 @@ elif ($c.class == 'msvc')
   else
     r = false
 
-  echo "have_$n = $r" >$o
+  # Sanitize check name to variable name.
+  #
+  echo "have_$regex.replace($n, '[-.+]', '_') = $r" >$o
 
   # Translate the /sourceDependencies JSON format to the list of headers
   # expected by dyndep depdb --format=lines above.
@@ -373,6 +403,37 @@ elif ($c.class == 'msvc')
   }
 }}
 
+# System header presence probe rule.
+#
+# Note: it only makes sense to go through a generated buildfile if you need to
+# use it as a dependency. Otherwise, just call the find_system_header()
+# directly.
+#
+# The header name can be specified with the header_name target-specific
+# variable, for example:
+#
+# buildfile{have-sys-types-h}: header_name = sys/types.h
+#
+# @@ TODO: add support for dependencies.
+#
+buildfile{~'/have-(.*)-h/'}:
+{{
+  o = $path($>) # Output.
+  n = $replace($name($>), 'have-', '', first_only)
+  h = ($($>: header_name) == [null] \
+       ? $replace($n, '-h', '.h', last_only) \
+       : $($>: header_name))
+  r = $c.find_system_header($h)
+
+  depdb string $r
+
+  diag check "for $h" -> $>
+
+  # Sanitize check name to variable name.
+  #
+  echo "have_$regex.replace($n, '[-.+]', '_') = ($r != [null])" >$o
+}}
+
 # Compile options that should be included in the probes.
 #
 
@@ -382,18 +443,26 @@ elif ($c.class == 'msvc')
 if ($c.target.class == 'linux')
   c.poptions += -D_GNU_SOURCE
 
+# System header/library presence checks (no probes).
+#
+#have_string_h = ($c.find_system_header(string.h) != [null])
+
 # Probes.
 #
+h_probes = have-string-h
 c_probes = have-strlcpy
 cxx_probes = have-strlcat
 
+for p: $h_probes
+  probes/buildfile{$p}: header_name = string1.h # @@ TMP
+
 for p: $c_probes
-  probes/buildfile{$p}: probes/c{$p}
+  probes/buildfile{$p}: probes/c{$p} probes/buildfile{$h_probes}
 
 for p: $cxx_probes
-  probes/buildfile{$p}: probes/cxx{$p}
+  probes/buildfile{$p}: probes/cxx{$p} probes/buildfile{$h_probes}
 
-probes = $c_probes $cxx_probes
+probes = $h_probes $c_probes $cxx_probes
 
 # Depending on how the result of the probes is used, it may be appropriate
 # to limit them to perform (see the `update` directive documentation for
@@ -414,6 +483,7 @@ source $path(probes/buildfile{$probes})
 
 ./: probes/buildfile{$probes} # Make sure gets cleaned.
 
+#info have_string_h: $have_string_h
 #info have_strlcpy: $have_strlcpy
 #info have_strlcat: $have_strlcat
 
