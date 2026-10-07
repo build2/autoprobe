@@ -557,6 +557,7 @@ source $path($probes)
 #}
 #else
 #{
+#  have_string_h = false
 #  have_strlcpy = false
 #  have_strlcat = false
 #}
