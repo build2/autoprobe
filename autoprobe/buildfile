@@ -524,7 +524,7 @@ probes =
 #
 for p: have-string-h
 {
-  probes/buildfile{$p}: header_name = string1.h # @@ TMP
+  probes/buildfile{$p}:
   probes += probes/buildfile{$p}
 }
 
